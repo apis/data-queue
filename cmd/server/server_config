@@ -1,0 +1,8 @@
+natsUserUrl:
+  nats://leaf_user:leaf_user@127.0.0.1:34111
+natsProducerPutSubject:
+  leaf.data-stream.producer.put
+natsConsumerGetSubject:
+  leaf.data-stream.consumer.get
+natsConsumerAckSubject:
+  leaf.data-stream.consumer.ack
