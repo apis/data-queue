@@ -141,7 +141,7 @@ func main() {
 
 	viper.SetDefault("natsUserUrl", "nats://hub_user:hub_user@127.0.0.1:34222")
 	viper.SetDefault("natsIngressUrl", "nats://leaf_ingress:leaf_ingress@127.0.0.1:34222")
-	viper.SetConfigName("client_config")
+	viper.SetConfigName("consumer_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {

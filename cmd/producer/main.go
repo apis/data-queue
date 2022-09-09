@@ -1,13 +1,13 @@
 package main
 
 import (
+	"data-queue/pkg/common"
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
-	"project/pkg/common"
 	"time"
 )
 

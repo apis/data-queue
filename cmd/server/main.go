@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"data-queue/pkg/common"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,6 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
-	"project/pkg/common"
 	"strings"
 	"time"
 )

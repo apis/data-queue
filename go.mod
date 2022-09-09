@@ -1,4 +1,4 @@
-module project
+module data-queue
 
 go 1.18
 
