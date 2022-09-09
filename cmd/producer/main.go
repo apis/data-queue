@@ -31,7 +31,10 @@ func main() {
 	pflag.String("natsName", "producer2", "NATS Connection Name")
 	pflag.String("bucket", "bucket2", "Queue bucket name")
 	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	natsUrl := viper.GetString("natsUrl")
 	natsName := viper.GetString("natsName")
@@ -92,5 +95,5 @@ func main() {
 
 	<-exitChannel
 
-	log.Info("Shutting down backend service")
+	log.Info("Shutting down Producer Client")
 }

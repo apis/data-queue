@@ -1,5 +1,10 @@
 natsUserUrl:
-  nats://hub_user:hub_user@127.0.0.1:34222
-natsIngressUrl:
-  nats://leaf_ingress:leaf_ingress@127.0.0.1:34222
-  
+  nats://leaf_user:leaf_user@127.0.0.1:34111
+natsName:
+  consumer1
+natsConsumerGetSubject:
+  leaf.data-stream.consumer.get
+natsConsumerAckSubject:
+  leaf.data-stream.consumer.ack
+producerBucket:
+    bucket1

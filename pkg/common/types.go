@@ -17,3 +17,11 @@ type ConsumerGetReply struct {
 	Data     string `json:"data"`
 	Error    string `json:"error"`
 }
+
+type ConsumerAckRequest struct {
+	PacketId string `json:"packet_id"`
+}
+
+type ConsumerAckReply struct {
+	Error string `json:"error"`
+}

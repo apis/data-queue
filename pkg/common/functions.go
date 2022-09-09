@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"time"
@@ -24,6 +25,7 @@ func ConnectToNats(natsUserUrl string, connectionName string) (*nats.Conn, error
 		log.Info("Attempting to connect to NATS")
 		natsConnection, err = options.Connect()
 		if err == nil {
+			log.Info("Connected to NATS")
 			break
 		}
 
@@ -45,4 +47,38 @@ func Publish(connection *nats.Conn, subject string, data any, logMessageFormat s
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func Request(natsConnection *nats.Conn, subject string, requestInboxPrefix string, data []byte, timeout time.Duration) (*nats.Msg, error) {
+	if natsConnection == nil {
+		return nil, nats.ErrInvalidConnection
+	}
+
+	//reply := fmt.Sprintf("%s.%s", requestInboxPrefix, nats.NewInbox())
+	reply := nats.NewInbox()
+	log.Infof("Inbox: %s", reply)
+
+	subscription, err := natsConnection.SubscribeSync(reply)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		err = subscription.Unsubscribe()
+		if err != nil {
+			log.Errorf("Unsubscribe: %s", fmt.Errorf("%w", err))
+		}
+	}()
+
+	if err := natsConnection.PublishRequest(subject, reply, data); err != nil {
+		return nil, err
+	}
+
+	msg, err := subscription.NextMsg(timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	//log.Infof("Reply: %s", msg.Data)
+	return msg, nil
 }
