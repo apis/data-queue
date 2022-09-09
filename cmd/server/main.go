@@ -23,9 +23,9 @@ func main() {
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
 	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.get")
 	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
-	viper.SetConfigName("producer_config")
+	viper.SetConfigName("server_config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath("./")
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))

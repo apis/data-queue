@@ -1,4 +1,4 @@
-natsUserUrl:
+natsUrl:
   nats://user:user@127.0.0.1:34111
 natsName:
   producer1
