@@ -125,5 +125,34 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 		return false
 	}
 
+	log.Infof("Processed data [%s]", reply.Data)
+
+	ackRequest := common.ConsumerAckRequest{PacketId: reply.PacketId}
+	buffer, err = json.Marshal(ackRequest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("Request Consumer Ack [%s] [%s]", natsConsumerAckSubject, string(buffer))
+	msg, err = natsConnection.Request(natsConsumerAckSubject, buffer, 3*time.Second)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+
+	var ackReply common.ConsumerAckReply
+	err = json.Unmarshal(msg.Data, &ackReply)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	log.Infof("Reply Consumer Ack [%s]", string(msg.Data))
+
+	if ackReply.Error != "" {
+		err = errors.New(reply.Error)
+		log.Error(err)
+		return false
+	}
+
 	return true
 }
