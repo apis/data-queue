@@ -1,5 +1,5 @@
 natsUserUrl:
-  nats://leaf_user:leaf_user@127.0.0.1:34111
+  nats://user:user@127.0.0.1:34111
 natsName:
   producer1
 natsProducerPutSubject:
@@ -9,4 +9,4 @@ producerBucket:
 dataRateInMs:
   250
 dataSizeInBytes:
-  1024
+  102400

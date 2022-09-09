@@ -1,5 +1,5 @@
 natsUserUrl:
-  nats://leaf_user:leaf_user@127.0.0.1:34111
+  nats://user:user@127.0.0.1:34222
 natsName:
   consumer1
 natsConsumerGetSubject:
@@ -7,4 +7,4 @@ natsConsumerGetSubject:
 natsConsumerAckSubject:
   leaf.data-stream.consumer.ack
 producerBucket:
-    bucket1
+  bucket1
