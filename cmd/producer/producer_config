@@ -5,4 +5,8 @@ natsName:
 natsProducerPutSubject:
   leaf.data-stream.producer.put
 producerBucket:
-    bucket1
+  bucket1
+dataRateInMs:
+  250
+dataSizeInBytes:
+  1024

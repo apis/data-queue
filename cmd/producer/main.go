@@ -4,6 +4,7 @@ import (
 	"data-queue/pkg/common"
 	"encoding/json"
 	"fmt"
+	"github.com/dchest/uniuri"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -19,6 +20,8 @@ func main() {
 	viper.SetDefault("natsName", "producer1")
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
 	viper.SetDefault("bucket", "bucket1")
+	viper.SetDefault("dataRateInMs", 250)
+	viper.SetDefault("dataSizeInBytes", 1024)
 	viper.SetConfigName("producer_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -39,6 +42,8 @@ func main() {
 	natsUrl := viper.GetString("natsUrl")
 	natsName := viper.GetString("natsName")
 	bucket := viper.GetString("bucket")
+	dataRateInMs := viper.GetInt("dataRateInMs")
+	dataSizeInBytes := viper.GetInt("dataSizeInBytes")
 	natsProducerPutSubject := viper.GetString("natsProducerPutSubject") + "." + bucket
 
 	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
@@ -52,7 +57,7 @@ func main() {
 		natsConnection.Close()
 	}()
 
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(time.Duration(dataRateInMs) * time.Millisecond)
 	stopTicker := make(chan bool)
 
 	defer func() {
@@ -64,9 +69,10 @@ func main() {
 			select {
 			case <-stopTicker:
 				return
-			case t := <-ticker.C:
-				message := t.Format(time.RFC3339)
+			case <-ticker.C:
+				//message := t.Format(time.RFC3339)
 				//data := base64.StdEncoding.EncodeToString([]byte(message))
+				message := uniuri.NewLen(dataSizeInBytes)
 				request := common.ProducerPutRequest{Data: message}
 
 				buffer, err := json.Marshal(request)
