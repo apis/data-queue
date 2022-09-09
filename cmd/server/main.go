@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -21,13 +20,14 @@ import (
 
 type storedItem struct {
 	PacketId uuid.UUID
-	Data     []byte
+	Data     string
 }
 
 func main() {
 	log.Info("Starting up Data Stream Service")
 
 	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
+	viper.SetDefault("storagePath", "./.queue")
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
 	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.get")
 	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
@@ -40,12 +40,13 @@ func main() {
 		}
 	}
 	natsUrl := viper.GetString("natsUrl")
+	storagePath := viper.GetString("storagePath")
 	natsProducerPutSubject := viper.GetString("natsProducerPutSubject")
 	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject")
 	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject")
 
 	log.Info("Opening Persisted Queue")
-	queue, err := goque.OpenPrefixQueue("./queue")
+	queue, err := goque.OpenPrefixQueue(storagePath)
 
 	defer func() {
 		log.Info("Closing Persisted Queue")
@@ -70,52 +71,55 @@ func main() {
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject, func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
+		log.Infof("Request Producer Put: %s", string(msg.Data))
+		logMessageFormat := "Reply Producer Put: %s"
+
 		err := json.Unmarshal(msg.Data, &request)
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
 			return
 		}
 
 		if len(strings.TrimSpace(request.BucketId)) == 0 {
-			err = errors.New("BucketId is empty")
+			err = errors.New("bucket id is empty")
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
 			return
 		}
 
 		if len(request.Data) == 0 {
-			err = errors.New("Data is empty")
+			err = errors.New("data is empty")
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
 			return
 		}
 
-		data, err := base64.StdEncoding.DecodeString(request.Data)
-		if err != nil {
-			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
-			return
-		}
+		//data, err := base64.StdEncoding.DecodeString(request.Data)
+		//if err != nil {
+		//	log.Warning(err)
+		//	publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+		//	return
+		//}
 
-		item := &storedItem{PacketId: uuid.New(), Data: data}
+		item := &storedItem{PacketId: uuid.New(), Data: request.Data}
 		buffer := new(bytes.Buffer)
 		encoder := gob.NewEncoder(buffer)
 		err = encoder.Encode(item)
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
 			return
 		}
 
 		_, err = queue.Enqueue([]byte(request.BucketId), buffer.Bytes())
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
+			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
 			return
 		}
 
-		publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: item.PacketId.String()})
+		publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: item.PacketId.String()}, logMessageFormat)
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -196,11 +200,13 @@ func connectToNats(natsUserUrl string, connectionName string) (*nats.Conn, error
 	return natsConnection, err
 }
 
-func publish(connection *nats.Conn, subject string, data any) {
+func publish(connection *nats.Conn, subject string, data any, logMessageFormat string) {
 	buffer, err := json.Marshal(data)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Infof(logMessageFormat, string(buffer))
 
 	err = connection.Publish(subject, buffer)
 	if err != nil {

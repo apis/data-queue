@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
@@ -55,15 +54,15 @@ func main() {
 				return
 			case t := <-ticker.C:
 				message := t.Format(time.RFC3339)
-				data := base64.StdEncoding.EncodeToString([]byte(message))
-				request := common.ProducerPutRequest{BucketId: producerBucket, Data: data}
-				log.Infof("Request Producer Put: %v", request)
+				//data := base64.StdEncoding.EncodeToString([]byte(message))
+				request := common.ProducerPutRequest{BucketId: producerBucket, Data: message}
 
 				buffer, err := json.Marshal(request)
 				if err != nil {
 					log.Fatal(err)
 				}
 
+				log.Infof("Request Producer Put: %s", string(buffer))
 				msg, err := natsConnection.Request(natsProducerPutSubject, buffer, 3*time.Second)
 				if err != nil {
 					log.Fatal(err)
@@ -74,9 +73,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-
-				log.Infof("Reply Producer Put: %v", reply)
-
+				log.Infof("Reply Producer Put: %s", string(msg.Data))
 			}
 		}
 	}()
