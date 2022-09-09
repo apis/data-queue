@@ -1,26 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"data-queue/pkg/common"
-	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/beeker1121/goque"
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 )
-
-type storedItem struct {
-	PacketId uuid.UUID
-	Data     string
-}
 
 func main() {
 	log.Info("Starting up Data Stream Service")
@@ -102,24 +95,15 @@ func main() {
 		//	return
 		//}
 
-		item := &storedItem{PacketId: uuid.New(), Data: request.Data}
-		buffer := new(bytes.Buffer)
-		encoder := gob.NewEncoder(buffer)
-		err = encoder.Encode(item)
+		item, err := queue.Enqueue([]byte(bucketId), []byte(request.Data))
 		if err != nil {
 			log.Warning(err)
 			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
-		_, err = queue.Enqueue([]byte(bucketId), buffer.Bytes())
-		if err != nil {
-			log.Warning(err)
-			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
-			return
-		}
-
-		common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: item.PacketId.String()},
+		id := strconv.FormatUint(item.ID, 16)
+		common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: id},
 			logMessageFormat)
 	})
 	if err != nil {
@@ -173,27 +157,9 @@ func main() {
 			return
 		}
 
-		buffer := new(bytes.Buffer)
-		_, err = buffer.Write(queueItem.Value)
-		if err != nil {
-			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-				logMessageFormat)
-			return
-		}
-
-		var item storedItem
-		decoder := gob.NewDecoder(buffer)
-		err = decoder.Decode(&item)
-		if err != nil {
-			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-				logMessageFormat)
-			return
-		}
-
-		common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: item.PacketId.String(),
-			Data: item.Data}, logMessageFormat)
+		id := strconv.FormatUint(queueItem.ID, 16)
+		common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: id,
+			Data: string(queueItem.Value)}, logMessageFormat)
 	})
 	if err != nil {
 		log.Fatal(err)

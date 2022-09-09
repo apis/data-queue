@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
@@ -15,8 +16,9 @@ func main() {
 	log.Info("Starting up Producer Client")
 
 	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
+	viper.SetDefault("natsName", "producer1")
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
-	viper.SetDefault("producerBucket", "bucket1")
+	viper.SetDefault("bucket", "bucket1")
 	viper.SetConfigName("producer_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -25,12 +27,19 @@ func main() {
 			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
 		}
 	}
-	natsUrl := viper.GetString("natsUrl")
-	producerBucket := viper.GetString("producerBucket")
-	natsProducerPutSubject := viper.GetString("natsProducerPutSubject") + "." + producerBucket
 
-	log.Infof("Connecting to NATS '%s'", natsUrl)
-	natsConnection, err := common.ConnectToNats(natsUrl, "Data Stream Service Connection")
+	pflag.String("natsName", "producer2", "NATS Connection Name")
+	pflag.String("bucket", "bucket2", "Queue bucket name")
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+
+	natsUrl := viper.GetString("natsUrl")
+	natsName := viper.GetString("natsName")
+	bucket := viper.GetString("bucket")
+	natsProducerPutSubject := viper.GetString("natsProducerPutSubject") + "." + bucket
+
+	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
+	natsConnection, err := common.ConnectToNats(natsUrl, natsName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,7 +71,7 @@ func main() {
 					log.Fatal(err)
 				}
 
-				log.Infof("Request Producer Put: %s", string(buffer))
+				log.Infof("Request Producer Put [%s] [%s]", natsProducerPutSubject, string(buffer))
 				msg, err := natsConnection.Request(natsProducerPutSubject, buffer, 3*time.Second)
 				if err != nil {
 					log.Fatal(err)
@@ -73,7 +82,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Infof("Reply Producer Put: %s", string(msg.Data))
+				log.Infof("Reply Producer Put [%s]", string(msg.Data))
 			}
 		}
 	}()

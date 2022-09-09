@@ -1,5 +1,7 @@
 natsUserUrl:
   nats://leaf_user:leaf_user@127.0.0.1:34111
+natsName:
+  producer1
 natsProducerPutSubject:
   leaf.data-stream.producer.put
 producerBucket:
