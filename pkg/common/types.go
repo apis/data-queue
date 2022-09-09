@@ -10,7 +10,6 @@ type ProducerPutReply struct {
 }
 
 type ConsumerGetRequest struct {
-	BucketId string `json:"bucket_id"`
 }
 
 type ConsumerGetReply struct {

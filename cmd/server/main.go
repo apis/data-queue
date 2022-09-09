@@ -35,7 +35,8 @@ func main() {
 	storagePath := viper.GetString("storagePath")
 	natsProducerPutSubjectPrefix := viper.GetString("natsProducerPutSubject") + "."
 	natsProducerPutSubject := natsProducerPutSubjectPrefix + "*"
-	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject") + ".*"
+	natsConsumerGetSubjectPrefix := viper.GetString("natsConsumerGetSubject") + "."
+	natsConsumerGetSubject := natsConsumerGetSubjectPrefix + "*"
 	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject") + ".*"
 
 	log.Info("Opening Persisted Queue")
@@ -123,31 +124,28 @@ func main() {
 	consumerGetSubjectSubscription, err := natsConnection.Subscribe(natsConsumerGetSubject, func(msg *nats.Msg) {
 		var request common.ConsumerGetRequest
 
-		log.Infof("Request Consumer Get: %s", string(msg.Data))
-		logMessageFormat := "Reply Consumer Get: %s"
+		log.Infof("Request Consumer Get [%s] [%s]", msg.Subject, string(msg.Data))
+		logMessageFormat := "Reply Consumer Get [%s]"
 
-		err := json.Unmarshal(msg.Data, &request)
+		bucketId, err := getBucketId(msg.Subject, natsConsumerGetSubjectPrefix)
 		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-				logMessageFormat)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
-		if len(strings.TrimSpace(request.BucketId)) == 0 {
-			err = errors.New("parameter bucket_id is empty")
+		err = json.Unmarshal(msg.Data, &request)
+		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-				logMessageFormat)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
-		queueItem, err := queue.Peek([]byte(request.BucketId))
+		queueItem, err := queue.Peek([]byte(bucketId))
 		if err != nil {
 			if err != goque.ErrEmpty {
 				log.Warning(err)
-				common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-					logMessageFormat)
+				publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 				return
 			}
 
@@ -200,6 +198,10 @@ func main() {
 
 func publishProducerPutReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
 	common.Publish(connection, subject, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+		logMessageFormat)
+}
+func publishConsumerGetReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
+	common.Publish(connection, subject, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
 		logMessageFormat)
 }
 
