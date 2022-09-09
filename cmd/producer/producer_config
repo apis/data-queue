@@ -3,4 +3,4 @@ natsUserUrl:
 natsProducerPutSubject:
   leaf.data-stream.producer.put
 producerBucket:
-    Bucket1
+    bucket1

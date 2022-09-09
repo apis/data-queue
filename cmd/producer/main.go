@@ -16,7 +16,7 @@ func main() {
 
 	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
-	viper.SetDefault("producerBucket", "Bucket1")
+	viper.SetDefault("producerBucket", "bucket1")
 	viper.SetConfigName("producer_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -26,8 +26,8 @@ func main() {
 		}
 	}
 	natsUrl := viper.GetString("natsUrl")
-	natsProducerPutSubject := viper.GetString("natsProducerPutSubject")
 	producerBucket := viper.GetString("producerBucket")
+	natsProducerPutSubject := viper.GetString("natsProducerPutSubject") + "." + producerBucket
 
 	log.Infof("Connecting to NATS '%s'", natsUrl)
 	natsConnection, err := common.ConnectToNats(natsUrl, "Data Stream Service Connection")
@@ -55,7 +55,7 @@ func main() {
 			case t := <-ticker.C:
 				message := t.Format(time.RFC3339)
 				//data := base64.StdEncoding.EncodeToString([]byte(message))
-				request := common.ProducerPutRequest{BucketId: producerBucket, Data: message}
+				request := common.ProducerPutRequest{Data: message}
 
 				buffer, err := json.Marshal(request)
 				if err != nil {

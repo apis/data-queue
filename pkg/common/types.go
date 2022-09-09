@@ -1,8 +1,7 @@
 package common
 
 type ProducerPutRequest struct {
-	BucketId string `json:"bucket_id"`
-	Data     string `json:"data"`
+	Data string `json:"data"`
 }
 
 type ProducerPutReply struct {

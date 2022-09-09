@@ -40,9 +40,10 @@ func main() {
 	}
 	natsUrl := viper.GetString("natsUrl")
 	storagePath := viper.GetString("storagePath")
-	natsProducerPutSubject := viper.GetString("natsProducerPutSubject")
-	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject")
-	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject")
+	natsProducerPutSubjectPrefix := viper.GetString("natsProducerPutSubject") + "."
+	natsProducerPutSubject := natsProducerPutSubjectPrefix + "*"
+	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject") + ".*"
+	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject") + ".*"
 
 	log.Info("Opening Persisted Queue")
 	queue, err := goque.OpenPrefixQueue(storagePath)
@@ -70,30 +71,27 @@ func main() {
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject, func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
-		log.Infof("Request Producer Put: %s", string(msg.Data))
-		logMessageFormat := "Reply Producer Put: %s"
+		log.Infof("Request Producer Put [%s] [%s]", msg.Subject, string(msg.Data))
+		logMessageFormat := "Reply Producer Put [%s]"
 
-		err := json.Unmarshal(msg.Data, &request)
+		bucketId, err := getBucketId(msg.Subject, natsProducerPutSubjectPrefix)
 		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-				logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
-		if len(strings.TrimSpace(request.BucketId)) == 0 {
-			err = errors.New("parameter bucket_id is empty")
+		err = json.Unmarshal(msg.Data, &request)
+		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-				logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
 		if len(request.Data) == 0 {
 			err = errors.New("parameter data is empty")
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-				logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
@@ -110,16 +108,14 @@ func main() {
 		err = encoder.Encode(item)
 		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-				logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
-		_, err = queue.Enqueue([]byte(request.BucketId), buffer.Bytes())
+		_, err = queue.Enqueue([]byte(bucketId), buffer.Bytes())
 		if err != nil {
 			log.Warning(err)
-			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-				logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 
@@ -234,4 +230,18 @@ func main() {
 	<-exitChannel
 
 	log.Info("Shutting Data Stream Service")
+}
+
+func publishProducerPutReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
+	common.Publish(connection, subject, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+		logMessageFormat)
+}
+
+func getBucketId(actualSubject string, prefixSubject string) (string, error) {
+	bucketId := strings.TrimPrefix(actualSubject, prefixSubject)
+	if bucketId == actualSubject {
+		err := errors.New("bucket_id was not found")
+		return "", err
+	}
+	return bucketId, nil
 }
