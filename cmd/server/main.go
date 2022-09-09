@@ -144,15 +144,15 @@ func main() {
 
 		queueItem, err := queue.Peek([]byte(bucketId))
 		if err != nil {
-			if err != goque.ErrEmpty {
-				log.Warning(err)
-				publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			if err == goque.ErrEmpty || err == goque.ErrOutOfBounds {
+				log.Info("No data available in a queue")
+				common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""},
+					logMessageFormat)
 				return
 			}
 
-			log.Info("No data available in a queue")
-			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""},
-				logMessageFormat)
+			log.Warning(err)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
 			return
 		}
 

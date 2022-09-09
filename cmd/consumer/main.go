@@ -102,8 +102,12 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	log.Infof("Request Consumer Get [%s] [%s]", natsConsumerGetSubject, string(buffer))
 	msg, err := natsConnection.Request(natsConsumerGetSubject, buffer, 3*time.Second)
 	if err != nil {
-		log.Error(err)
-		return false
+		if err == nats.ErrTimeout {
+			log.Error(err)
+			return false
+		}
+
+		log.Fatal(err)
 	}
 
 	var reply common.ConsumerGetReply
@@ -136,8 +140,12 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	log.Infof("Request Consumer Ack [%s] [%s]", natsConsumerAckSubject, string(buffer))
 	msg, err = natsConnection.Request(natsConsumerAckSubject, buffer, 3*time.Second)
 	if err != nil {
-		log.Error(err)
-		return false
+		if err == nats.ErrTimeout {
+			log.Error(err)
+			return false
+		}
+
+		log.Fatal(err)
 	}
 
 	var ackReply common.ConsumerAckReply
