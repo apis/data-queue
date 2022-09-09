@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"time"
 )
 
 type storedItem struct {
@@ -57,7 +56,7 @@ func main() {
 	}()
 
 	log.Infof("Connecting to NATS '%s'", natsUrl)
-	natsConnection, err := connectToNats(natsUrl, "Data Stream Service Connection")
+	natsConnection, err := common.ConnectToNats(natsUrl, "Data Stream Service Connection")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,21 +76,24 @@ func main() {
 		err := json.Unmarshal(msg.Data, &request)
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
+			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+				logMessageFormat)
 			return
 		}
 
 		if len(strings.TrimSpace(request.BucketId)) == 0 {
-			err = errors.New("bucket id is empty")
+			err = errors.New("parameter bucket_id is empty")
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
+			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+				logMessageFormat)
 			return
 		}
 
 		if len(request.Data) == 0 {
-			err = errors.New("data is empty")
+			err = errors.New("parameter data is empty")
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
+			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+				logMessageFormat)
 			return
 		}
 
@@ -108,18 +110,21 @@ func main() {
 		err = encoder.Encode(item)
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
+			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+				logMessageFormat)
 			return
 		}
 
 		_, err = queue.Enqueue([]byte(request.BucketId), buffer.Bytes())
 		if err != nil {
 			log.Warning(err)
-			publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""}, logMessageFormat)
+			common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
+				logMessageFormat)
 			return
 		}
 
-		publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: item.PacketId.String()}, logMessageFormat)
+		common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: item.PacketId.String()},
+			logMessageFormat)
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -136,6 +141,63 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", natsConsumerGetSubject)
 	consumerGetSubjectSubscription, err := natsConnection.Subscribe(natsConsumerGetSubject, func(msg *nats.Msg) {
+		var request common.ConsumerGetRequest
+
+		log.Infof("Request Consumer Get: %s", string(msg.Data))
+		logMessageFormat := "Reply Consumer Get: %s"
+
+		err := json.Unmarshal(msg.Data, &request)
+		if err != nil {
+			log.Warning(err)
+			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
+				logMessageFormat)
+			return
+		}
+
+		if len(strings.TrimSpace(request.BucketId)) == 0 {
+			err = errors.New("parameter bucket_id is empty")
+			log.Warning(err)
+			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
+				logMessageFormat)
+			return
+		}
+
+		queueItem, err := queue.Peek([]byte(request.BucketId))
+		if err != nil {
+			if err != goque.ErrEmpty {
+				log.Warning(err)
+				common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
+					logMessageFormat)
+				return
+			}
+
+			log.Info("No data available in a queue")
+			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""},
+				logMessageFormat)
+			return
+		}
+
+		buffer := new(bytes.Buffer)
+		_, err = buffer.Write(queueItem.Value)
+		if err != nil {
+			log.Warning(err)
+			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
+				logMessageFormat)
+			return
+		}
+
+		var item storedItem
+		decoder := gob.NewDecoder(buffer)
+		err = decoder.Decode(&item)
+		if err != nil {
+			log.Warning(err)
+			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
+				logMessageFormat)
+			return
+		}
+
+		common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: item.PacketId.String(),
+			Data: item.Data}, logMessageFormat)
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -172,44 +234,4 @@ func main() {
 	<-exitChannel
 
 	log.Info("Shutting Data Stream Service")
-}
-
-func connectToNats(natsUserUrl string, connectionName string) (*nats.Conn, error) {
-	options := nats.Options{
-		Url:  natsUserUrl,
-		Name: connectionName,
-	}
-
-	var natsConnection *nats.Conn
-	var err error
-
-	for index := 0; index < 5; index++ {
-		if index > 0 {
-			time.Sleep(time.Second)
-		}
-
-		log.Info("Attempting to connect to NATS")
-		natsConnection, err = options.Connect()
-		if err == nil {
-			break
-		}
-
-		log.Errorf("NATS connection failed [%v]", err)
-	}
-
-	return natsConnection, err
-}
-
-func publish(connection *nats.Conn, subject string, data any, logMessageFormat string) {
-	buffer, err := json.Marshal(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Infof(logMessageFormat, string(buffer))
-
-	err = connection.Publish(subject, buffer)
-	if err != nil {
-		log.Fatal(err)
-	}
 }
