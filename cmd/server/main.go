@@ -66,27 +66,26 @@ func main() {
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject, func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
-		log.Infof("Request Producer Put [%s] [%s]", msg.Subject, string(msg.Data))
-		logMessageFormat := "Reply Producer Put [%s]"
+		log.Infof("Request Producer Put [%s]", msg.Subject)
 
 		bucketId, err := getBucketId(msg.Subject, natsProducerPutSubjectPrefix)
 		if err != nil {
 			log.Warning(err)
-			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		err = json.Unmarshal(msg.Data, &request)
 		if err != nil {
 			log.Warning(err)
-			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		if len(request.Data) == 0 {
 			err = errors.New("parameter data is empty")
 			log.Warning(err)
-			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
@@ -100,13 +99,13 @@ func main() {
 		item, err := queue.Enqueue([]byte(bucketId), []byte(request.Data))
 		if err != nil {
 			log.Warning(err)
-			publishProducerPutReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		id := strconv.FormatUint(item.ID, 16)
-		common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: id},
-			logMessageFormat)
+		log.Infof("Reply Producer Put [PacketId: %s]", id)
+		common.Publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: "", PacketId: id})
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -125,20 +124,19 @@ func main() {
 	consumerGetSubjectSubscription, err := natsConnection.Subscribe(natsConsumerGetSubject, func(msg *nats.Msg) {
 		var request common.ConsumerGetRequest
 
-		log.Infof("Request Consumer Get [%s] [%s]", msg.Subject, string(msg.Data))
-		logMessageFormat := "Reply Consumer Get [%s]"
+		log.Infof("Request Consumer Get [%s]", msg.Subject)
 
 		bucketId, err := getBucketId(msg.Subject, natsConsumerGetSubjectPrefix)
 		if err != nil {
 			log.Warning(err)
-			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		err = json.Unmarshal(msg.Data, &request)
 		if err != nil {
 			log.Warning(err)
-			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
@@ -146,19 +144,18 @@ func main() {
 		if err != nil {
 			if err == goque.ErrEmpty || err == goque.ErrOutOfBounds {
 				log.Info("No data available in a queue")
-				common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""},
-					logMessageFormat)
+				common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""})
 				return
 			}
 
 			log.Warning(err)
-			publishConsumerGetReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		id := strconv.FormatUint(queueItem.ID, 16)
 		common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: id,
-			Data: string(queueItem.Value)}, logMessageFormat)
+			Data: string(queueItem.Value)})
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -177,52 +174,52 @@ func main() {
 	consumerAckSubjectSubscription, err := natsConnection.Subscribe(natsConsumerAckSubject, func(msg *nats.Msg) {
 		var request common.ConsumerAckRequest
 
-		log.Infof("Request Consumer Ack [%s] [%s]", msg.Subject, string(msg.Data))
-		logMessageFormat := "Reply Consumer Ack [%s]"
+		log.Infof("Request Consumer Ack [%s]", msg.Subject)
 
 		bucketId, err := getBucketId(msg.Subject, natsConsumerAckSubjectPrefix)
 		if err != nil {
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		err = json.Unmarshal(msg.Data, &request)
 		if err != nil {
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		queueItem, err := queue.Peek([]byte(bucketId))
 		if err != nil {
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		id, err := strconv.ParseUint(request.PacketId, 16, 64)
 		if err != nil {
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		if queueItem.ID != id {
 			err = errors.New("parameter packet_id is not matching")
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		_, err = queue.Dequeue([]byte(bucketId))
 		if err != nil {
 			log.Warning(err)
-			publishConsumerAckReplyError(natsConnection, msg.Reply, err, logMessageFormat)
+			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
-		common.Publish(natsConnection, msg.Reply, &common.ConsumerAckReply{Error: ""}, logMessageFormat)
+		log.Info("Reply Consumer Ack")
+		common.Publish(natsConnection, msg.Reply, &common.ConsumerAckReply{Error: ""})
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -245,19 +242,19 @@ func main() {
 	log.Info("Shutting Data Stream Service")
 }
 
-func publishProducerPutReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
-	common.Publish(connection, subject, &common.ProducerPutReply{Error: err.Error(), PacketId: ""},
-		logMessageFormat)
+func publishProducerPutReplyError(connection *nats.Conn, subject string, err error) {
+	log.Infof("Reply Producer Put [Error: %s]", err.Error())
+	common.Publish(connection, subject, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
 }
 
-func publishConsumerGetReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
-	common.Publish(connection, subject, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""},
-		logMessageFormat)
+func publishConsumerGetReplyError(connection *nats.Conn, subject string, err error) {
+	log.Infof("Reply Consumer Get [Error: %s]", err.Error())
+	common.Publish(connection, subject, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""})
 }
 
-func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error, logMessageFormat string) {
-	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()},
-		logMessageFormat)
+func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error) {
+	log.Infof("Reply Consumer Ack [Error: %s]", err.Error())
+	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()})
 }
 
 func getBucketId(actualSubject string, prefixSubject string) (string, error) {

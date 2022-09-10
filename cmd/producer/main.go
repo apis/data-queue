@@ -70,7 +70,6 @@ func main() {
 			case <-stopTicker:
 				return
 			case <-ticker.C:
-				//message := t.Format(time.RFC3339)
 				//data := base64.StdEncoding.EncodeToString([]byte(message))
 				message := uniuri.NewLen(dataSizeInBytes)
 				request := common.ProducerPutRequest{Data: message}
@@ -80,7 +79,7 @@ func main() {
 					log.Fatal(err)
 				}
 
-				log.Infof("Request Producer Put [%s] [%s]", natsProducerPutSubject, string(buffer))
+				log.Infof("Request Producer Put [%s]", natsProducerPutSubject)
 				msg, err := natsConnection.Request(natsProducerPutSubject, buffer, 3*time.Second)
 				if err != nil {
 					log.Fatal(err)
@@ -91,7 +90,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Infof("Reply Producer Put [%s]", string(msg.Data))
+				log.Infof("Reply Producer Put [PacketId: %s, Error: %s]", reply.PacketId, reply.Error)
 			}
 		}
 	}()

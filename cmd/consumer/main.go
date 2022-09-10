@@ -99,7 +99,7 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 		log.Fatal(err)
 	}
 
-	log.Infof("Request Consumer Get [%s] [%s]", natsConsumerGetSubject, string(buffer))
+	log.Infof("Request Consumer Get [%s]", natsConsumerGetSubject)
 	msg, err := natsConnection.Request(natsConsumerGetSubject, buffer, 3*time.Second)
 	if err != nil {
 		if err == nats.ErrTimeout {
@@ -116,7 +116,7 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 		log.Error(err)
 		return false
 	}
-	log.Infof("Reply Consumer Get [%s]", string(msg.Data))
+	log.Infof("Reply Consumer Get [PacketId: %s, Error: %s]", reply.PacketId, reply.Error)
 
 	if reply.Error != "" {
 		err = errors.New(reply.Error)
@@ -129,15 +129,13 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 		return false
 	}
 
-	log.Infof("Processed data [%s]", reply.Data)
-
 	ackRequest := common.ConsumerAckRequest{PacketId: reply.PacketId}
 	buffer, err = json.Marshal(ackRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Infof("Request Consumer Ack [%s] [%s]", natsConsumerAckSubject, string(buffer))
+	log.Infof("Request Consumer Ack [%s]", natsConsumerAckSubject)
 	msg, err = natsConnection.Request(natsConsumerAckSubject, buffer, 3*time.Second)
 	if err != nil {
 		if err == nats.ErrTimeout {
@@ -154,7 +152,7 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 		log.Error(err)
 		return false
 	}
-	log.Infof("Reply Consumer Ack [%s]", string(msg.Data))
+	log.Infof("Reply Consumer Ack [Error: %s]", ackReply.Error)
 
 	if ackReply.Error != "" {
 		err = errors.New(reply.Error)

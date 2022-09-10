@@ -35,13 +35,11 @@ func ConnectToNats(natsUserUrl string, connectionName string) (*nats.Conn, error
 	return natsConnection, err
 }
 
-func Publish(connection *nats.Conn, subject string, data any, logMessageFormat string) {
+func Publish(connection *nats.Conn, subject string, data any) {
 	buffer, err := json.Marshal(data)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	log.Infof(logMessageFormat, string(buffer))
 
 	err = connection.Publish(subject, buffer)
 	if err != nil {
