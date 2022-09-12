@@ -142,6 +142,11 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 			return false
 		}
 
+		if err == nats.ErrNoResponders {
+			log.Error(err)
+			return false
+		}
+
 		log.Fatal(err)
 	}
 
@@ -174,6 +179,11 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	msg, err = natsConnection.Request(natsConsumerAckSubject, buffer, 3*time.Second)
 	if err != nil {
 		if err == nats.ErrTimeout {
+			log.Error(err)
+			return false
+		}
+
+		if err == nats.ErrNoResponders {
 			log.Error(err)
 			return false
 		}

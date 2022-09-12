@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dchest/uniuri"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -82,6 +83,16 @@ func main() {
 				log.Infof("Request Producer Put [%s]", natsProducerPutSubject)
 				msg, err := natsConnection.Request(natsProducerPutSubject, buffer, 3*time.Second)
 				if err != nil {
+					if err == nats.ErrTimeout {
+						log.Error(err)
+						continue
+					}
+
+					if err == nats.ErrNoResponders {
+						log.Error(err)
+						continue
+					}
+
 					log.Fatal(err)
 				}
 

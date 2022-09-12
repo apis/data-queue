@@ -42,6 +42,8 @@ func main() {
 	log.Info("Opening Persisted Queue")
 	queue, err := goque.OpenPrefixQueue(storagePath)
 
+	log.Infof("Queue size %d", queue.Length())
+
 	defer func() {
 		log.Info("Closing Persisted Queue")
 		err := queue.Close()
