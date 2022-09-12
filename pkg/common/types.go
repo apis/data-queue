@@ -25,3 +25,6 @@ type ConsumerAckRequest struct {
 type ConsumerAckReply struct {
 	Error string `json:"error"`
 }
+
+type ConsumerAnnRequest struct {
+}

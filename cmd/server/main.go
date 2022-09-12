@@ -36,6 +36,7 @@ func main() {
 	natsConsumerGetSubject := natsConsumerGetSubjectPrefix + "*"
 	natsConsumerAckSubjectPrefix := viper.GetString("natsConsumerAckSubject") + "."
 	natsConsumerAckSubject := natsConsumerAckSubjectPrefix + "*"
+	natsConsumerAnnSubjectPrefix := viper.GetString("natsConsumerAnnSubject") + "."
 
 	log.Info("Opening Persisted Queue")
 	queue, err := goque.OpenPrefixQueue(storagePath)
@@ -61,7 +62,7 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", natsProducerPutSubject)
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject,
-		getProducerPutHandler(natsProducerPutSubjectPrefix, natsConnection, queue))
+		getProducerPutHandler(natsProducerPutSubjectPrefix, natsConsumerAnnSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}

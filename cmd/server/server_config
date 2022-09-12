@@ -8,3 +8,5 @@ natsConsumerGetSubject:
   leaf.data-stream.consumer.get
 natsConsumerAckSubject:
   leaf.data-stream.consumer.ack
+natsConsumerAnnSubject:
+  leaf.data-stream.consumer.ann

@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-func getProducerPutHandler(natsProducerPutSubjectPrefix string, natsConnection *nats.Conn,
+func getProducerPutHandler(natsProducerPutSubjectPrefix string, natsConsumerAnnSubjectPrefix string, natsConnection *nats.Conn,
 	queue *goque.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
@@ -19,35 +19,39 @@ func getProducerPutHandler(natsProducerPutSubjectPrefix string, natsConnection *
 
 		bucketId, err := getBucketId(msg.Subject, natsProducerPutSubjectPrefix)
 		if err != nil {
-			log.Warning(err)
+			log.Error(err)
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		err = json.Unmarshal(msg.Data, &request)
 		if err != nil {
-			log.Warning(err)
+			log.Error(err)
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		if len(request.Data) == 0 {
 			err = errors.New("parameter data is empty")
-			log.Warning(err)
+			log.Error(err)
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
-		//data, err := base64.StdEncoding.DecodeString(request.Data)
-		//if err != nil {
-		//	log.Warning(err)
-		//	publish(natsConnection, msg.Reply, &common.ProducerPutReply{Error: err.Error(), PacketId: ""})
-		//	return
-		//}
+		_, err = queue.Peek([]byte(bucketId))
+		if err != nil {
+			if err == goque.ErrEmpty || err == goque.ErrOutOfBounds {
+				log.Info("Announce that new data available in a queue")
+				common.Publish(natsConnection, natsConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
+			} else {
+				publishProducerPutReplyError(natsConnection, msg.Reply, err)
+				return
+			}
+		}
 
 		item, err := queue.Enqueue([]byte(bucketId), []byte(request.Data))
 		if err != nil {
-			log.Warning(err)
+			log.Error(err)
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}

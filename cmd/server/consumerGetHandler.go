@@ -17,14 +17,14 @@ func getConsumerGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *
 
 		bucketId, err := getBucketId(msg.Subject, natsConsumerGetSubjectPrefix)
 		if err != nil {
-			log.Warning(err)
+			log.Error(err)
 			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
 		err = json.Unmarshal(msg.Data, &request)
 		if err != nil {
-			log.Warning(err)
+			log.Error(err)
 			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
@@ -37,7 +37,7 @@ func getConsumerGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *
 				return
 			}
 
-			log.Warning(err)
+			log.Error(err)
 			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
 			return
 		}
