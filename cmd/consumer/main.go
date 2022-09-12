@@ -79,7 +79,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	jumpToNextItem <- true
+	setJumpToNextItem(jumpToNextItem)
 
 	go func() {
 		for {
@@ -88,7 +88,7 @@ func main() {
 				log.Info("-> Next")
 				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject)
 				if jumpToNext {
-					jumpToNextItem <- true
+					setJumpToNextItem(jumpToNextItem)
 				}
 			case <-ctx.Done():
 				log.Info("-> Done")
@@ -97,7 +97,7 @@ func main() {
 				log.Info("-> Time")
 				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject)
 				if jumpToNext {
-					jumpToNextItem <- true
+					setJumpToNextItem(jumpToNextItem)
 				}
 			}
 		}
@@ -123,7 +123,7 @@ func getConsumerAnnHandler(jumpToNextItem chan bool) func(msg *nats.Msg) {
 			return
 		}
 
-		jumpToNextItem <- true
+		setJumpToNextItem(jumpToNextItem)
 	}
 }
 
@@ -196,4 +196,13 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	}
 
 	return true
+}
+
+func setJumpToNextItem(jumpToNextItem chan bool) {
+	select {
+	case jumpToNextItem <- true:
+		log.Info("Set JumpToNextItem")
+	default:
+		log.Info("JumpToNextItem already set")
+	}
 }
