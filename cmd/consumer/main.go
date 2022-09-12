@@ -22,6 +22,7 @@ func main() {
 	viper.SetDefault("natsName", "consumer1")
 	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.get")
 	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
+	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.ann")
 	viper.SetDefault("bucket", "bucket1")
 	viper.SetConfigName("consumer_config")
 	viper.SetConfigType("yaml")
@@ -45,6 +46,7 @@ func main() {
 	bucket := viper.GetString("bucket")
 	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject") + "." + bucket
 	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject") + "." + bucket
+	natsConsumerAnnSubject := viper.GetString("natsConsumerAnnSubject") + "." + bucket
 
 	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
 	natsConnection, err := common.ConnectToNats(natsUrl, natsName)
@@ -58,6 +60,23 @@ func main() {
 	}()
 
 	jumpToNextItem := make(chan bool, 1)
+
+	log.Infof("Subscribing to '%s'", natsConsumerAckSubject)
+	consumerAckSubjectSubscription, err := natsConnection.Subscribe(natsConsumerAnnSubject,
+		getConsumerAnnHandler(jumpToNextItem))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		log.Infof("Unsubscribing from '%s'", natsConsumerAckSubject)
+
+		err = consumerAckSubjectSubscription.Unsubscribe()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	jumpToNextItem <- true
@@ -90,6 +109,22 @@ func main() {
 	<-exitChannel
 
 	log.Info("Shutting down Consumer Client")
+}
+
+func getConsumerAnnHandler(jumpToNextItem chan bool) func(msg *nats.Msg) {
+	return func(msg *nats.Msg) {
+		var request common.ConsumerAnnRequest
+
+		log.Infof("Request Consumer Ann [%s]", msg.Subject)
+
+		err := json.Unmarshal(msg.Data, &request)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		jumpToNextItem <- true
+	}
 }
 
 func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsConsumerAckSubject string) bool {

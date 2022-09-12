@@ -20,6 +20,7 @@ func main() {
 	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
 	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.get")
 	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
+	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.ann")
 	viper.SetConfigName("server_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("./")
