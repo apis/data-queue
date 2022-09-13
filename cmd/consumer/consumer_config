@@ -10,3 +10,5 @@ natsConsumerAnnSubject:
   leaf.data-stream.consumer.ann
 producerBucket:
   bucket1
+pollTimeoutInMs:
+  1000

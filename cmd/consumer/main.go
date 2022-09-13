@@ -24,6 +24,7 @@ func main() {
 	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
 	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.ann")
 	viper.SetDefault("bucket", "bucket1")
+	viper.SetDefault("pollTimeoutInMs", 1000)
 	viper.SetConfigName("consumer_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -44,6 +45,7 @@ func main() {
 	natsUrl := viper.GetString("natsUrl")
 	natsName := viper.GetString("natsName")
 	bucket := viper.GetString("bucket")
+	pollTimeoutInMs := viper.GetInt("pollTimeoutInMs")
 	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject") + "." + bucket
 	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject") + "." + bucket
 	natsConsumerAnnSubject := viper.GetString("natsConsumerAnnSubject") + "." + bucket
@@ -93,7 +95,7 @@ func main() {
 			case <-ctx.Done():
 				log.Info("-> Done")
 				return
-			case <-time.After(time.Second):
+			case <-time.After(time.Duration(pollTimeoutInMs) * time.Millisecond):
 				log.Info("-> Time")
 				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject)
 				if jumpToNext {
