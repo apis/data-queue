@@ -10,8 +10,8 @@ import (
 	"strconv"
 )
 
-func getProducerPutHandler(natsProducerPutSubjectPrefix string, natsConsumerAnnSubjectPrefix string, natsConnection *nats.Conn,
-	queue *goque.PrefixQueue) func(msg *nats.Msg) {
+func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsumerAnnSubjectPrefix string,
+	natsEphemeralConsumerAnnSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
@@ -42,7 +42,8 @@ func getProducerPutHandler(natsProducerPutSubjectPrefix string, natsConsumerAnnS
 		if err != nil {
 			if err == goque.ErrEmpty || err == goque.ErrOutOfBounds {
 				log.Info("Announce that new data available in a queue")
-				common.Publish(natsConnection, natsConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
+				common.Publish(natsConnection, natsPersistentConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
+				common.Publish(natsConnection, natsEphemeralConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
 			} else {
 				publishProducerPutReplyError(natsConnection, msg.Reply, err)
 				return

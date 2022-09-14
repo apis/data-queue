@@ -1,10 +1,12 @@
 package main
 
 import (
+	"data-queue/cmd/server/ephemeral"
 	"data-queue/pkg/common"
 	"errors"
 	"fmt"
 	"github.com/beeker1121/goque"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -58,7 +60,7 @@ func main() {
 	natsSubjectPrefix := viper.GetString("natsSubjectPrefix")
 	natsProducerSubjectPrefix := viper.GetString("natsProducerSubjectPrefix")
 	natsConsumerSubjectPrefix := viper.GetString("natsConsumerSubjectPrefix")
-	//natsEphemeralSubjectPrefix := viper.GetString("natsEphemeralSubjectPrefix")
+	natsEphemeralSubjectPrefix := viper.GetString("natsEphemeralSubjectPrefix")
 	natsPersistentSubjectPrefix := viper.GetString("natsPersistentSubjectPrefix")
 	natsPutSubjectSuffix := viper.GetString("natsPutSubjectSuffix")
 	natsGetSubjectSuffix := viper.GetString("natsGetSubjectSuffix")
@@ -76,13 +78,15 @@ func main() {
 
 	natsPersistentConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsPersistentSubjectPrefix, natsAnnSubjectSuffix)
 
-	//natsEphemeralConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsGetSubjectSuffix)
-	//natsEphemeralConsumerGetSubject := fmt.Sprintf("%s*", natsEphemeralConsumerGetSubjectPrefix)
-	//
-	//natsEphemeralConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAckSubjectSuffix)
-	//natsEphemeralConsumerAckSubject := fmt.Sprintf("%s*", natsEphemeralConsumerAckSubjectPrefix)
-	//
-	//natsEphemeralConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAnnSubjectSuffix)
+	natsEphemeralConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsGetSubjectSuffix)
+	natsEphemeralConsumerGetSubject := fmt.Sprintf("%s*", natsEphemeralConsumerGetSubjectPrefix)
+
+	natsEphemeralConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAckSubjectSuffix)
+	natsEphemeralConsumerAckSubject := fmt.Sprintf("%s*", natsEphemeralConsumerAckSubjectPrefix)
+
+	natsEphemeralConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAnnSubjectSuffix)
+
+	ephemeralQueue := ephemeral.New()
 
 	log.Info("Opening Persisted Queue")
 	queue, err := goque.OpenPrefixQueue(storagePath)
@@ -127,7 +131,7 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", natsProducerPutSubject)
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject,
-		getProducerPutHandler(natsProducerPutSubjectPrefix, natsPersistentConsumerAnnSubjectPrefix, natsConnection, queue))
+		producerPutHandler(natsProducerPutSubjectPrefix, natsPersistentConsumerAnnSubjectPrefix, natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -142,8 +146,8 @@ func main() {
 	}()
 
 	log.Infof("Subscribing to '%s'", natsPersistentConsumerGetSubject)
-	consumerGetSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerGetSubject,
-		getConsumerGetHandler(natsPersistentConsumerGetSubjectPrefix, natsConnection, queue))
+	persistentConsumerGetSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerGetSubject,
+		consumerPersistentGetHandler(natsPersistentConsumerGetSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,15 +155,31 @@ func main() {
 	defer func() {
 		log.Infof("Unsubscribing from '%s'", natsPersistentConsumerGetSubject)
 
-		err = consumerGetSubjectSubscription.Unsubscribe()
+		err = persistentConsumerGetSubjectSubscription.Unsubscribe()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
+	log.Infof("Subscribing to '%s'", natsEphemeralConsumerGetSubject)
+	ephemeralConsumerGetSubjectSubscription, err := natsConnection.Subscribe(natsEphemeralConsumerGetSubject,
+		consumerEphemeralGetHandler(natsEphemeralConsumerGetSubjectPrefix, natsConnection, ephemeralQueue))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		log.Infof("Unsubscribing from '%s'", natsEphemeralConsumerGetSubject)
+
+		err = ephemeralConsumerGetSubjectSubscription.Unsubscribe()
 		if err != nil {
 			log.Error(err)
 		}
 	}()
 
 	log.Infof("Subscribing to '%s'", natsPersistentConsumerAckSubject)
-	consumerAckSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerAckSubject,
-		getConsumerAckHandler(natsPersistentConsumerAckSubjectPrefix, natsConnection, queue))
+	persistentConsumerAckSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerAckSubject,
+		consumerPersistentAckHandler(natsPersistentConsumerAckSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,7 +187,23 @@ func main() {
 	defer func() {
 		log.Infof("Unsubscribing from '%s'", natsPersistentConsumerAckSubject)
 
-		err = consumerAckSubjectSubscription.Unsubscribe()
+		err = persistentConsumerAckSubjectSubscription.Unsubscribe()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+
+	log.Infof("Subscribing to '%s'", natsEphemeralConsumerAckSubject)
+	ephemeralConsumerAckSubjectSubscription, err := natsConnection.Subscribe(natsEphemeralConsumerAckSubject,
+		consumerEphemeralAckHandler(natsEphemeralConsumerAckSubjectPrefix, natsConnection, ephemeralQueue))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		log.Infof("Unsubscribing from '%s'", natsEphemeralConsumerAckSubject)
+
+		err = ephemeralConsumerAckSubjectSubscription.Unsubscribe()
 		if err != nil {
 			log.Error(err)
 		}
@@ -188,4 +224,14 @@ func getBucketId(actualSubject string, prefixSubject string) (string, error) {
 		return "", err
 	}
 	return bucketId, nil
+}
+
+func publishConsumerGetReplyError(connection *nats.Conn, subject string, err error) {
+	log.Infof("Reply Consumer Get [Error: %s]", err.Error())
+	common.Publish(connection, subject, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""})
+}
+
+func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error) {
+	log.Infof("Reply Consumer Ack [Error: %s]", err.Error())
+	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()})
 }

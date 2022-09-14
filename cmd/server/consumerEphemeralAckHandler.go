@@ -1,22 +1,23 @@
 package main
 
 import (
+	"data-queue/cmd/server/ephemeral"
 	"data-queue/pkg/common"
 	"encoding/json"
 	"errors"
-	"github.com/beeker1121/goque"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"strconv"
 )
 
-func getConsumerAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue) func(msg *nats.Msg) {
+func consumerEphemeralAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *nats.Conn, queue *ephemeral.Queue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ConsumerAckRequest
 
 		log.Infof("Request Consumer Ack [%s]", msg.Subject)
 
-		bucketId, err := getBucketId(msg.Subject, natsConsumerAckSubjectPrefix)
+		// TODO use bucket!!!
+		_, err := getBucketId(msg.Subject, natsConsumerAckSubjectPrefix)
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
@@ -30,7 +31,7 @@ func getConsumerAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *
 			return
 		}
 
-		queueItem, err := queue.Peek([]byte(bucketId))
+		_, itemId, err := queue.Peek()
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
@@ -44,14 +45,14 @@ func getConsumerAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *
 			return
 		}
 
-		if queueItem.ID != id {
+		if itemId != id {
 			err = errors.New("parameter packet_id is not matching")
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
 
-		_, err = queue.Dequeue([]byte(bucketId))
+		_, _, err = queue.Dequeue()
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
@@ -61,9 +62,4 @@ func getConsumerAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *
 		log.Info("Reply Consumer Ack")
 		common.Publish(natsConnection, msg.Reply, &common.ConsumerAckReply{Error: ""})
 	}
-}
-
-func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error) {
-	log.Infof("Reply Consumer Ack [Error: %s]", err.Error())
-	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()})
 }

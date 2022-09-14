@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-func getConsumerGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue) func(msg *nats.Msg) {
+func consumerPersistentGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ConsumerGetRequest
 
@@ -46,9 +46,4 @@ func getConsumerGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *
 		common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: id,
 			Data: string(queueItem.Value)})
 	}
-}
-
-func publishConsumerGetReplyError(connection *nats.Conn, subject string, err error) {
-	log.Infof("Reply Consumer Get [Error: %s]", err.Error())
-	common.Publish(connection, subject, &common.ConsumerGetReply{Error: err.Error(), PacketId: "", Data: ""})
 }
