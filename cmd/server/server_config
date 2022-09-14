@@ -6,11 +6,19 @@ storagePath:
   ./.queue
 natsSubjectPrefix:
   leaf.data-stream
-natsProducerPutSubjectSuffix:
-  producer.put
-natsConsumerGetSubjectSuffix:
-  consumer.get
-natsConsumerAckSubjectSuffix:
-  consumer.ack
-natsConsumerAnnSubjectSuffix:
-  consumer.ann
+natsProducerSubjectPrefix:
+  producer
+natsConsumerSubjectPrefix:
+  consumer
+natsEphemeralSubjectPrefix:
+  ephemeral
+natsPersistentSubjectPrefix:
+  persistent
+natsPutSubjectSuffix:
+  put
+natsGetSubjectSuffix:
+  get
+natsAckSubjectSuffix:
+  ack
+natsAnnSubjectSuffix:
+  ann
