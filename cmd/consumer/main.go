@@ -18,11 +18,14 @@ import (
 func main() {
 	log.Info("Starting up Consumer Client")
 
+	const natsSubjectPrefixDefault = "leaf.data-stream.consumer.persistent"
+
 	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
 	viper.SetDefault("natsName", "consumer1")
-	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.persistent.get")
-	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.persistent.ack")
-	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.persistent.ann")
+	viper.SetDefault("natsSubjectPrefix", natsSubjectPrefixDefault)
+	viper.SetDefault("natsGetSubjectSuffix", "get")
+	viper.SetDefault("natsAckSubjectSuffix", "ack")
+	viper.SetDefault("natsAnnSubjectSuffix", "ann")
 	viper.SetDefault("bucket", "bucket1")
 	viper.SetDefault("pollTimeoutInMs", 1000)
 	viper.SetConfigName("consumer_config")
@@ -36,6 +39,8 @@ func main() {
 
 	pflag.String("natsName", "consumer2", "NATS Connection Name")
 	pflag.String("bucket", "bucket2", "Queue bucket name")
+	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
+
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
@@ -44,11 +49,16 @@ func main() {
 
 	natsUrl := viper.GetString("natsUrl")
 	natsName := viper.GetString("natsName")
+	natsSubjectPrefix := viper.GetString("natsSubjectPrefix")
+	natsGetSubjectSuffix := viper.GetString("natsGetSubjectSuffix")
+	natsAckSubjectSuffix := viper.GetString("natsAckSubjectSuffix")
+	natsAnnSubjectSuffix := viper.GetString("natsAnnSubjectSuffix")
 	bucket := viper.GetString("bucket")
 	pollTimeoutInMs := viper.GetInt("pollTimeoutInMs")
-	natsConsumerGetSubject := viper.GetString("natsConsumerGetSubject") + "." + bucket
-	natsConsumerAckSubject := viper.GetString("natsConsumerAckSubject") + "." + bucket
-	natsConsumerAnnSubject := viper.GetString("natsConsumerAnnSubject") + "." + bucket
+
+	natsConsumerGetSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsGetSubjectSuffix, bucket)
+	natsConsumerAckSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsAckSubjectSuffix, bucket)
+	natsConsumerAnnSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsAnnSubjectSuffix, bucket)
 
 	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
 	natsConnection, err := common.ConnectToNats(natsUrl, natsName)

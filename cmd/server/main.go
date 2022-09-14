@@ -47,7 +47,7 @@ func main() {
 
 	pflag.String("natsName", natsNameDefault, "NATS connection name")
 	pflag.String("storagePath", storagePathDefault, "Storage path directory")
-	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "Storage path directory")
+	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
