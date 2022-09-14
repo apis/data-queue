@@ -3,11 +3,11 @@ natsUrl:
 natsName:
   consumer1
 natsConsumerGetSubject:
-  leaf.data-stream.consumer.get
+  leaf.data-stream.consumer.persistent.get
 natsConsumerAckSubject:
-  leaf.data-stream.consumer.ack
+  leaf.data-stream.consumer.persistent.ack
 natsConsumerAnnSubject:
-  leaf.data-stream.consumer.ann
+  leaf.data-stream.consumer.persistent.ann
 producerBucket:
   bucket1
 pollTimeoutInMs:

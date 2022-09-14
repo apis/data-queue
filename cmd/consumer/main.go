@@ -20,9 +20,9 @@ func main() {
 
 	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
 	viper.SetDefault("natsName", "consumer1")
-	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.get")
-	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.ack")
-	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.ann")
+	viper.SetDefault("natsConsumerGetSubject", "leaf.data-stream.consumer.persistent.get")
+	viper.SetDefault("natsConsumerAckSubject", "leaf.data-stream.consumer.persistent.ack")
+	viper.SetDefault("natsConsumerAnnSubject", "leaf.data-stream.consumer.persistent.ann")
 	viper.SetDefault("bucket", "bucket1")
 	viper.SetDefault("pollTimeoutInMs", 1000)
 	viper.SetConfigName("consumer_config")
