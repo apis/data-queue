@@ -1,6 +1,7 @@
 package main
 
 import (
+	"data-queue/cmd/server/ephemeral"
 	"data-queue/pkg/common"
 	"encoding/json"
 	"errors"
@@ -11,7 +12,7 @@ import (
 )
 
 func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsumerAnnSubjectPrefix string,
-	natsEphemeralConsumerAnnSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue) func(msg *nats.Msg) {
+	natsEphemeralConsumerAnnSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue, ephemeralQueue *ephemeral.Queue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
@@ -43,7 +44,6 @@ func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsu
 			if err == goque.ErrEmpty || err == goque.ErrOutOfBounds {
 				log.Info("Announce that new data available in a queue")
 				common.Publish(natsConnection, natsPersistentConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
-				common.Publish(natsConnection, natsEphemeralConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
 			} else {
 				publishProducerPutReplyError(natsConnection, msg.Reply, err)
 				return
@@ -56,6 +56,13 @@ func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsu
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
+
+		_, _, err = ephemeralQueue.Peek()
+		if err != nil {
+			common.Publish(natsConnection, natsEphemeralConsumerAnnSubjectPrefix+bucketId, &common.ConsumerAnnRequest{})
+		}
+
+		ephemeralQueue.Enqueue(request.Data, item.ID)
 
 		id := strconv.FormatUint(item.ID, 16)
 		log.Infof("Reply Producer Put [PacketId: %s]", id)

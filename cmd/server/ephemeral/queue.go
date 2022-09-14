@@ -12,22 +12,19 @@ type queueItem struct {
 }
 
 type Queue struct {
-	list   *list.List
-	mutex  sync.Mutex
-	lastId uint64
+	list  *list.List
+	mutex sync.Mutex
 }
 
 func New() *Queue {
-	return &Queue{list: list.New(), lastId: 0}
+	return &Queue{list: list.New()}
 }
 
-func (queue *Queue) Enqueue(content string) uint64 {
+func (queue *Queue) Enqueue(content string, id uint64) {
 	queue.mutex.Lock()
 	defer queue.mutex.Unlock()
 
-	queue.lastId = queue.lastId + 1
-	queue.list.PushBack(&queueItem{Id: queue.lastId, Content: content})
-	return queue.lastId
+	queue.list.PushBack(&queueItem{Id: id, Content: content})
 }
 
 func (queue *Queue) Dequeue() (content string, id uint64, err error) {

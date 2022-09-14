@@ -131,7 +131,8 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", natsProducerPutSubject)
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject,
-		producerPutHandler(natsProducerPutSubjectPrefix, natsPersistentConsumerAnnSubjectPrefix, natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue))
+		producerPutHandler(natsProducerPutSubjectPrefix, natsPersistentConsumerAnnSubjectPrefix,
+			natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue, ephemeralQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
