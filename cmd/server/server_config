@@ -1,12 +1,16 @@
 natsUrl:
   nats://user:user@127.0.0.1:34111
+natsName:
+  NATS Queue Service
 storagePath:
   ./.queue
-natsProducerPutSubject:
-  leaf.data-stream.producer.put
-natsConsumerGetSubject:
-  leaf.data-stream.consumer.get
-natsConsumerAckSubject:
-  leaf.data-stream.consumer.ack
-natsConsumerAnnSubject:
-  leaf.data-stream.consumer.ann
+natsSubjectPrefix:
+  leaf.data-stream
+natsProducerPutSubjectSuffix:
+  producer.put
+natsConsumerGetSubjectSuffix:
+  consumer.get
+natsConsumerAckSubjectSuffix:
+  consumer.ack
+natsConsumerAnnSubjectSuffix:
+  consumer.ann
