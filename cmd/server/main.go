@@ -18,7 +18,7 @@ func main() {
 	opt := parseOptions()
 	sOpt := parseSubjectOptions(opt)
 
-	ephemeralQueue := ephemeral.New()
+	ephemeralPrefixQueue := ephemeral.NewPrefixQueue()
 
 	log.Info("Opening Persisted Queue")
 	queue, err := goque.OpenPrefixQueue(opt.storagePath)
@@ -64,7 +64,7 @@ func main() {
 	log.Infof("Subscribing to '%s'", sOpt.natsProducerPutSubject)
 	producerPutSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsProducerPutSubject,
 		producerPutHandler(sOpt.natsProducerPutSubjectPrefix, sOpt.natsPersistentConsumerAnnSubjectPrefix,
-			sOpt.natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue, ephemeralQueue))
+			sOpt.natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue, ephemeralPrefixQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", sOpt.natsEphemeralConsumerGetSubject)
 	ephemeralConsumerGetSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsEphemeralConsumerGetSubject,
-		consumerEphemeralGetHandler(sOpt.natsEphemeralConsumerGetSubjectPrefix, natsConnection, ephemeralQueue))
+		consumerEphemeralGetHandler(sOpt.natsEphemeralConsumerGetSubjectPrefix, natsConnection, ephemeralPrefixQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func main() {
 
 	log.Infof("Subscribing to '%s'", sOpt.natsEphemeralConsumerAckSubject)
 	ephemeralConsumerAckSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsEphemeralConsumerAckSubject,
-		consumerEphemeralAckHandler(sOpt.natsEphemeralConsumerAckSubjectPrefix, natsConnection, ephemeralQueue))
+		consumerEphemeralAckHandler(sOpt.natsEphemeralConsumerAckSubjectPrefix, natsConnection, ephemeralPrefixQueue))
 	if err != nil {
 		log.Fatal(err)
 	}

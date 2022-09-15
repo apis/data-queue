@@ -9,14 +9,14 @@ import (
 	"strconv"
 )
 
-func consumerEphemeralGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *nats.Conn, queue *ephemeral.Queue) func(msg *nats.Msg) {
+func consumerEphemeralGetHandler(natsConsumerGetSubjectPrefix string, natsConnection *nats.Conn,
+	ephemeralPrefixQueue *ephemeral.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ConsumerGetRequest
 
 		log.Infof("Request Consumer Get [%s]", msg.Subject)
 
-		// TODO use bucket!!!
-		_, err := getBucketId(msg.Subject, natsConsumerGetSubjectPrefix)
+		bucketId, err := getBucketId(msg.Subject, natsConsumerGetSubjectPrefix)
 		if err != nil {
 			log.Error(err)
 			publishConsumerGetReplyError(natsConnection, msg.Reply, err)
@@ -30,7 +30,9 @@ func consumerEphemeralGetHandler(natsConsumerGetSubjectPrefix string, natsConnec
 			return
 		}
 
-		itemContent, itemId, err := queue.Peek()
+		ephemeralQueue := ephemeralPrefixQueue.Get(bucketId)
+
+		itemContent, itemId, err := ephemeralQueue.Peek()
 		if err != nil {
 			log.Info("No data available in a queue")
 			common.Publish(natsConnection, msg.Reply, &common.ConsumerGetReply{Error: "", PacketId: "", Data: ""})

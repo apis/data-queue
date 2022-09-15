@@ -12,7 +12,8 @@ import (
 )
 
 func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsumerAnnSubjectPrefix string,
-	natsEphemeralConsumerAnnSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue, ephemeralQueue *ephemeral.Queue) func(msg *nats.Msg) {
+	natsEphemeralConsumerAnnSubjectPrefix string, natsConnection *nats.Conn, queue *goque.PrefixQueue,
+	ephemeralPrefixQueue *ephemeral.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ProducerPutRequest
 
@@ -56,6 +57,8 @@ func producerPutHandler(natsProducerPutSubjectPrefix string, natsPersistentConsu
 			publishProducerPutReplyError(natsConnection, msg.Reply, err)
 			return
 		}
+
+		ephemeralQueue := ephemeralPrefixQueue.Get(bucketId)
 
 		_, _, err = ephemeralQueue.Peek()
 		if err != nil {

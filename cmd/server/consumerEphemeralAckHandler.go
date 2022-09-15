@@ -10,14 +10,14 @@ import (
 	"strconv"
 )
 
-func consumerEphemeralAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *nats.Conn, queue *ephemeral.Queue) func(msg *nats.Msg) {
+func consumerEphemeralAckHandler(natsConsumerAckSubjectPrefix string, natsConnection *nats.Conn,
+	ephemeralPrefixQueue *ephemeral.PrefixQueue) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		var request common.ConsumerAckRequest
 
 		log.Infof("Request Consumer Ack [%s]", msg.Subject)
 
-		// TODO use bucket!!!
-		_, err := getBucketId(msg.Subject, natsConsumerAckSubjectPrefix)
+		bucketId, err := getBucketId(msg.Subject, natsConsumerAckSubjectPrefix)
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
@@ -31,7 +31,9 @@ func consumerEphemeralAckHandler(natsConsumerAckSubjectPrefix string, natsConnec
 			return
 		}
 
-		_, itemId, err := queue.Peek()
+		ephemeralQueue := ephemeralPrefixQueue.Get(bucketId)
+
+		_, itemId, err := ephemeralQueue.Peek()
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
@@ -52,12 +54,13 @@ func consumerEphemeralAckHandler(natsConsumerAckSubjectPrefix string, natsConnec
 			return
 		}
 
-		_, _, err = queue.Dequeue()
+		_, _, err = ephemeralQueue.Dequeue()
 		if err != nil {
 			log.Error(err)
 			publishConsumerAckReplyError(natsConnection, msg.Reply, err)
 			return
 		}
+		ephemeralPrefixQueue.TryDelete(bucketId, ephemeralQueue)
 
 		log.Info("Reply Consumer Ack")
 		common.Publish(natsConnection, msg.Reply, &common.ConsumerAckReply{Error: ""})

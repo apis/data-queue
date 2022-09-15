@@ -16,7 +16,7 @@ type Queue struct {
 	mutex sync.Mutex
 }
 
-func New() *Queue {
+func newQueue() *Queue {
 	return &Queue{list: list.New()}
 }
 
@@ -52,4 +52,11 @@ func (queue *Queue) peekWithDelete(delete bool) (string, uint64, error) {
 		queue.list.Remove(front)
 	}
 	return item.Content, item.Id, nil
+}
+
+func (queue *Queue) Length() int {
+	queue.mutex.Lock()
+	defer queue.mutex.Unlock()
+
+	return queue.list.Len()
 }
