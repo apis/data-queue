@@ -30,12 +30,13 @@ func parseOptions() *options {
 }
 
 func (opt *options) getOptions() {
+	const natsUrlDefault = "nats://user:user@127.0.0.1:34111"
 	const natsNameDefault = "NATS Queue Service"
 	const storagePathDefault = "./.queue"
 	const natsIncomingSubjectPrefixDefault = "leaf.incoming.data-stream"
 	const natsOutgoingSubjectPrefixDefault = "leaf.outgoing.data-stream"
 
-	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
+	viper.SetDefault("natsUrl", natsUrlDefault)
 	viper.SetDefault("natsName", natsNameDefault)
 	viper.SetDefault("storagePath", storagePathDefault)
 	viper.SetDefault("natsIncomingSubjectPrefix", natsIncomingSubjectPrefixDefault)
@@ -59,6 +60,7 @@ func (opt *options) getOptions() {
 		}
 	}
 
+	pflag.String("natsUrl", natsNameDefault, "NATS connection URL")
 	pflag.String("natsName", natsNameDefault, "NATS connection name")
 	pflag.String("storagePath", storagePathDefault, "Storage path directory")
 	pflag.String("natsIncomingSubjectPrefix", natsIncomingSubjectPrefixDefault, "NATS incoming subject prefix")

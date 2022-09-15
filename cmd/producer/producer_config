@@ -1,11 +1,15 @@
 natsUrl:
   nats://user:user@127.0.0.1:34111
 natsName:
-  producer1
-natsProducerPutSubject:
-  leaf.data-stream.producer.put
-producerBucket:
+  NATS Queue Producer
+bucket:
   bucket1
+natsIncomingSubjectPrefix:
+  leaf.incoming.data-stream
+natsOutgoingSubjectPrefix:
+  leaf.outgoing.data-stream
+natsPutSubjectPrefix:
+  producer.put
 dataRateInMs:
   250
 dataSizeInBytes:

@@ -7,8 +7,6 @@ import (
 	"github.com/dchest/uniuri"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"time"
@@ -17,38 +15,15 @@ import (
 func main() {
 	log.Info("Starting up Producer Client")
 
-	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
-	viper.SetDefault("natsName", "producer1")
-	viper.SetDefault("natsProducerPutSubject", "leaf.data-stream.producer.put")
-	viper.SetDefault("bucket", "bucket1")
-	viper.SetDefault("dataRateInMs", 250)
-	viper.SetDefault("dataSizeInBytes", 1024)
-	viper.SetConfigName("producer_config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
-		}
-	}
+	opt := parseOptions()
 
-	pflag.String("natsName", "producer2", "NATS Connection Name")
-	pflag.String("bucket", "bucket2", "Queue bucket name")
-	pflag.Parse()
-	err := viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		log.Fatal(err)
-	}
+	natsProducerPutSubject := fmt.Sprintf("%s.%s.%s", opt.natsIncomingSubjectPrefix,
+		opt.natsPutSubjectPrefix, opt.bucket)
 
-	natsUrl := viper.GetString("natsUrl")
-	natsName := viper.GetString("natsName")
-	bucket := viper.GetString("bucket")
-	dataRateInMs := viper.GetInt("dataRateInMs")
-	dataSizeInBytes := viper.GetInt("dataSizeInBytes")
-	natsProducerPutSubject := viper.GetString("natsProducerPutSubject") + "." + bucket
+	natsReplySubjectPrefix := opt.natsOutgoingSubjectPrefix
 
-	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
-	natsConnection, err := common.ConnectToNats(natsUrl, natsName)
+	log.Infof("Connecting to NATS '%s' as '%s'", opt.natsUrl, opt.natsName)
+	natsConnection, err := common.ConnectToNats(opt.natsUrl, opt.natsName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,7 +33,7 @@ func main() {
 		natsConnection.Close()
 	}()
 
-	ticker := time.NewTicker(time.Duration(dataRateInMs) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(opt.dataRateInMs) * time.Millisecond)
 	stopTicker := make(chan bool)
 
 	defer func() {
@@ -71,8 +46,7 @@ func main() {
 			case <-stopTicker:
 				return
 			case <-ticker.C:
-				//data := base64.StdEncoding.EncodeToString([]byte(message))
-				message := uniuri.NewLen(dataSizeInBytes)
+				message := uniuri.NewLen(opt.dataSizeInBytes)
 				request := common.ProducerPutRequest{Data: message}
 
 				buffer, err := json.Marshal(request)
@@ -81,7 +55,7 @@ func main() {
 				}
 
 				log.Infof("Request Producer Put [%s]", natsProducerPutSubject)
-				msg, err := natsConnection.Request(natsProducerPutSubject, buffer, 3*time.Second)
+				msg, err := common.Request(natsConnection, natsProducerPutSubject, natsReplySubjectPrefix, buffer, 3*time.Second)
 				if err != nil {
 					if err == nats.ErrTimeout {
 						log.Error(err)
