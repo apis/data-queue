@@ -4,62 +4,19 @@ import (
 	"data-queue/cmd/server/ephemeral"
 	"data-queue/pkg/common"
 	"errors"
-	"fmt"
 	"github.com/beeker1121/goque"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"strings"
 )
 
-type options struct {
-	natsUrl                     string
-	natsName                    string
-	storagePath                 string
-	natsSubjectPrefix           string
-	natsProducerSubjectPrefix   string
-	natsConsumerSubjectPrefix   string
-	natsEphemeralSubjectPrefix  string
-	natsPersistentSubjectPrefix string
-	natsPutSubjectSuffix        string
-	natsGetSubjectSuffix        string
-	natsAckSubjectSuffix        string
-	natsAnnSubjectSuffix        string
-}
-
 func main() {
 	log.Info("Starting up Data Stream Service")
 
-	opt := getOptions()
-
-	natsProducerPutSubjectPrefix := fmt.Sprintf("%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsProducerSubjectPrefix, opt.natsPutSubjectSuffix)
-	natsProducerPutSubject := fmt.Sprintf("%s*", natsProducerPutSubjectPrefix)
-
-	natsPersistentConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsGetSubjectSuffix)
-	natsPersistentConsumerGetSubject := fmt.Sprintf("%s*", natsPersistentConsumerGetSubjectPrefix)
-
-	natsPersistentConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsAckSubjectSuffix)
-	natsPersistentConsumerAckSubject := fmt.Sprintf("%s*", natsPersistentConsumerAckSubjectPrefix)
-
-	natsPersistentConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsAnnSubjectSuffix)
-
-	natsEphemeralConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsGetSubjectSuffix)
-	natsEphemeralConsumerGetSubject := fmt.Sprintf("%s*", natsEphemeralConsumerGetSubjectPrefix)
-
-	natsEphemeralConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsAckSubjectSuffix)
-	natsEphemeralConsumerAckSubject := fmt.Sprintf("%s*", natsEphemeralConsumerAckSubjectPrefix)
-
-	natsEphemeralConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
-		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsAnnSubjectSuffix)
+	opt := parseOptions()
+	sOpt := parseSubjectOptions(opt)
 
 	ephemeralQueue := ephemeral.New()
 
@@ -104,16 +61,16 @@ func main() {
 		natsConnection.Close()
 	}()
 
-	log.Infof("Subscribing to '%s'", natsProducerPutSubject)
-	producerPutSubjectSubscription, err := natsConnection.Subscribe(natsProducerPutSubject,
-		producerPutHandler(natsProducerPutSubjectPrefix, natsPersistentConsumerAnnSubjectPrefix,
-			natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue, ephemeralQueue))
+	log.Infof("Subscribing to '%s'", sOpt.natsProducerPutSubject)
+	producerPutSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsProducerPutSubject,
+		producerPutHandler(sOpt.natsProducerPutSubjectPrefix, sOpt.natsPersistentConsumerAnnSubjectPrefix,
+			sOpt.natsEphemeralConsumerAnnSubjectPrefix, natsConnection, queue, ephemeralQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer func() {
-		log.Infof("Unsubscribing from '%s'", natsProducerPutSubject)
+		log.Infof("Unsubscribing from '%s'", sOpt.natsProducerPutSubject)
 
 		err = producerPutSubjectSubscription.Unsubscribe()
 		if err != nil {
@@ -121,15 +78,15 @@ func main() {
 		}
 	}()
 
-	log.Infof("Subscribing to '%s'", natsPersistentConsumerGetSubject)
-	persistentConsumerGetSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerGetSubject,
-		consumerPersistentGetHandler(natsPersistentConsumerGetSubjectPrefix, natsConnection, queue))
+	log.Infof("Subscribing to '%s'", sOpt.natsPersistentConsumerGetSubject)
+	persistentConsumerGetSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsPersistentConsumerGetSubject,
+		consumerPersistentGetHandler(sOpt.natsPersistentConsumerGetSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer func() {
-		log.Infof("Unsubscribing from '%s'", natsPersistentConsumerGetSubject)
+		log.Infof("Unsubscribing from '%s'", sOpt.natsPersistentConsumerGetSubject)
 
 		err = persistentConsumerGetSubjectSubscription.Unsubscribe()
 		if err != nil {
@@ -137,15 +94,15 @@ func main() {
 		}
 	}()
 
-	log.Infof("Subscribing to '%s'", natsEphemeralConsumerGetSubject)
-	ephemeralConsumerGetSubjectSubscription, err := natsConnection.Subscribe(natsEphemeralConsumerGetSubject,
-		consumerEphemeralGetHandler(natsEphemeralConsumerGetSubjectPrefix, natsConnection, ephemeralQueue))
+	log.Infof("Subscribing to '%s'", sOpt.natsEphemeralConsumerGetSubject)
+	ephemeralConsumerGetSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsEphemeralConsumerGetSubject,
+		consumerEphemeralGetHandler(sOpt.natsEphemeralConsumerGetSubjectPrefix, natsConnection, ephemeralQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer func() {
-		log.Infof("Unsubscribing from '%s'", natsEphemeralConsumerGetSubject)
+		log.Infof("Unsubscribing from '%s'", sOpt.natsEphemeralConsumerGetSubject)
 
 		err = ephemeralConsumerGetSubjectSubscription.Unsubscribe()
 		if err != nil {
@@ -153,15 +110,15 @@ func main() {
 		}
 	}()
 
-	log.Infof("Subscribing to '%s'", natsPersistentConsumerAckSubject)
-	persistentConsumerAckSubjectSubscription, err := natsConnection.Subscribe(natsPersistentConsumerAckSubject,
-		consumerPersistentAckHandler(natsPersistentConsumerAckSubjectPrefix, natsConnection, queue))
+	log.Infof("Subscribing to '%s'", sOpt.natsPersistentConsumerAckSubject)
+	persistentConsumerAckSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsPersistentConsumerAckSubject,
+		consumerPersistentAckHandler(sOpt.natsPersistentConsumerAckSubjectPrefix, natsConnection, queue))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer func() {
-		log.Infof("Unsubscribing from '%s'", natsPersistentConsumerAckSubject)
+		log.Infof("Unsubscribing from '%s'", sOpt.natsPersistentConsumerAckSubject)
 
 		err = persistentConsumerAckSubjectSubscription.Unsubscribe()
 		if err != nil {
@@ -169,15 +126,15 @@ func main() {
 		}
 	}()
 
-	log.Infof("Subscribing to '%s'", natsEphemeralConsumerAckSubject)
-	ephemeralConsumerAckSubjectSubscription, err := natsConnection.Subscribe(natsEphemeralConsumerAckSubject,
-		consumerEphemeralAckHandler(natsEphemeralConsumerAckSubjectPrefix, natsConnection, ephemeralQueue))
+	log.Infof("Subscribing to '%s'", sOpt.natsEphemeralConsumerAckSubject)
+	ephemeralConsumerAckSubjectSubscription, err := natsConnection.Subscribe(sOpt.natsEphemeralConsumerAckSubject,
+		consumerEphemeralAckHandler(sOpt.natsEphemeralConsumerAckSubjectPrefix, natsConnection, ephemeralQueue))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer func() {
-		log.Infof("Unsubscribing from '%s'", natsEphemeralConsumerAckSubject)
+		log.Infof("Unsubscribing from '%s'", sOpt.natsEphemeralConsumerAckSubject)
 
 		err = ephemeralConsumerAckSubjectSubscription.Unsubscribe()
 		if err != nil {
@@ -210,61 +167,4 @@ func publishConsumerGetReplyError(connection *nats.Conn, subject string, err err
 func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error) {
 	log.Infof("Reply Consumer Ack [Error: %s]", err.Error())
 	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()})
-}
-
-func getOptions() *options {
-	var opt options
-
-	const natsNameDefault = "NATS Queue Service"
-	const storagePathDefault = "./.queue"
-	const natsSubjectPrefixDefault = "leaf.data-stream"
-
-	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
-	viper.SetDefault("natsName", natsNameDefault)
-	viper.SetDefault("storagePath", storagePathDefault)
-	viper.SetDefault("natsSubjectPrefix", natsSubjectPrefixDefault)
-	viper.SetDefault("natsProducerSubjectPrefix", "producer")
-	viper.SetDefault("natsConsumerSubjectPrefix", "consumer")
-	viper.SetDefault("natsEphemeralSubjectPrefix", "ephemeral")
-	viper.SetDefault("natsPersistentSubjectPrefix", "persistent")
-	viper.SetDefault("natsPutSubjectSuffix", "put")
-	viper.SetDefault("natsGetSubjectSuffix", "get")
-	viper.SetDefault("natsAckSubjectSuffix", "ack")
-	viper.SetDefault("natsAnnSubjectSuffix", "ann")
-
-	viper.SetConfigName("server_config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
-		}
-	}
-
-	pflag.String("natsName", natsNameDefault, "NATS connection name")
-	pflag.String("storagePath", storagePathDefault, "Storage path directory")
-	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
-	pflag.Parse()
-	err := viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	opt.natsUrl = viper.GetString("natsUrl")
-	opt.natsName = viper.GetString("natsName")
-	opt.storagePath = viper.GetString("storagePath")
-	opt.natsSubjectPrefix = viper.GetString("natsSubjectPrefix")
-	opt.natsProducerSubjectPrefix = viper.GetString("natsProducerSubjectPrefix")
-	opt.natsConsumerSubjectPrefix = viper.GetString("natsConsumerSubjectPrefix")
-	opt.natsEphemeralSubjectPrefix = viper.GetString("natsEphemeralSubjectPrefix")
-	opt.natsPersistentSubjectPrefix = viper.GetString("natsPersistentSubjectPrefix")
-	opt.natsPutSubjectSuffix = viper.GetString("natsPutSubjectSuffix")
-	opt.natsGetSubjectSuffix = viper.GetString("natsGetSubjectSuffix")
-	opt.natsAckSubjectSuffix = viper.GetString("natsAckSubjectSuffix")
-	opt.natsAnnSubjectSuffix = viper.GetString("natsAnnSubjectSuffix")
-
-	log.Infof("Configuration: %+v", opt)
-
-	return &opt
 }

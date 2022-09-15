@@ -4,8 +4,10 @@ natsName:
   NATS Queue Service
 storagePath:
   ./.queue
-natsSubjectPrefix:
-  leaf.data-stream
+natsIncomingSubjectPrefix:
+  leaf.incoming.data-stream
+natsOutgoingSubjectPrefix:
+  leaf.outgoing.data-stream
 natsProducerSubjectPrefix:
   producer
 natsConsumerSubjectPrefix:
