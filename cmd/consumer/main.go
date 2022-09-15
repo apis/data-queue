@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"time"
@@ -18,50 +16,18 @@ import (
 func main() {
 	log.Info("Starting up Consumer Client")
 
-	const natsSubjectPrefixDefault = "leaf.data-stream.consumer.persistent"
+	opt := parseOptions()
 
-	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
-	viper.SetDefault("natsName", "consumer1")
-	viper.SetDefault("natsSubjectPrefix", natsSubjectPrefixDefault)
-	viper.SetDefault("natsGetSubjectSuffix", "get")
-	viper.SetDefault("natsAckSubjectSuffix", "ack")
-	viper.SetDefault("natsAnnSubjectSuffix", "ann")
-	viper.SetDefault("bucket", "bucket1")
-	viper.SetDefault("pollTimeoutInMs", 1000)
-	viper.SetConfigName("consumer_config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
-		}
-	}
+	natsConsumerGetSubject := fmt.Sprintf("%s.%s.%s.%s", opt.natsIncomingSubjectPrefix, opt.natsConsumerSubjectPrefix,
+		opt.natsGetSubjectSuffix, opt.bucket)
+	natsConsumerAckSubject := fmt.Sprintf("%s.%s.%s.%s", opt.natsIncomingSubjectPrefix, opt.natsConsumerSubjectPrefix,
+		opt.natsAckSubjectSuffix, opt.bucket)
+	natsConsumerAnnSubject := fmt.Sprintf("%s.%s.%s.%s", opt.natsOutgoingSubjectPrefix, opt.natsConsumerSubjectPrefix,
+		opt.natsAnnSubjectSuffix, opt.bucket)
+	natsReplySubjectPrefix := opt.natsOutgoingSubjectPrefix
 
-	pflag.String("natsName", "consumer2", "NATS Connection Name")
-	pflag.String("bucket", "bucket2", "Queue bucket name")
-	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
-
-	pflag.Parse()
-	err := viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	natsUrl := viper.GetString("natsUrl")
-	natsName := viper.GetString("natsName")
-	natsSubjectPrefix := viper.GetString("natsSubjectPrefix")
-	natsGetSubjectSuffix := viper.GetString("natsGetSubjectSuffix")
-	natsAckSubjectSuffix := viper.GetString("natsAckSubjectSuffix")
-	natsAnnSubjectSuffix := viper.GetString("natsAnnSubjectSuffix")
-	bucket := viper.GetString("bucket")
-	pollTimeoutInMs := viper.GetInt("pollTimeoutInMs")
-
-	natsConsumerGetSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsGetSubjectSuffix, bucket)
-	natsConsumerAckSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsAckSubjectSuffix, bucket)
-	natsConsumerAnnSubject := fmt.Sprintf("%s.%s.%s", natsSubjectPrefix, natsAnnSubjectSuffix, bucket)
-
-	log.Infof("Connecting to NATS '%s' as '%s'", natsUrl, natsName)
-	natsConnection, err := common.ConnectToNats(natsUrl, natsName)
+	log.Infof("Connecting to NATS '%s' as '%s'", opt.natsUrl, opt.natsName)
+	natsConnection, err := common.ConnectToNats(opt.natsUrl, opt.natsName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,16 +64,16 @@ func main() {
 			select {
 			case <-jumpToNextItem:
 				log.Info("-> Next")
-				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject)
+				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject, natsReplySubjectPrefix)
 				if jumpToNext {
 					setJumpToNextItem(jumpToNextItem)
 				}
 			case <-ctx.Done():
 				log.Info("-> Done")
 				return
-			case <-time.After(time.Duration(pollTimeoutInMs) * time.Millisecond):
+			case <-time.After(time.Duration(opt.pollTimeoutInMs) * time.Millisecond):
 				log.Info("-> Time")
-				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject)
+				jumpToNext := processItem(natsConnection, natsConsumerGetSubject, natsConsumerAckSubject, natsReplySubjectPrefix)
 				if jumpToNext {
 					setJumpToNextItem(jumpToNextItem)
 				}
@@ -139,7 +105,7 @@ func getConsumerAnnHandler(jumpToNextItem chan bool) func(msg *nats.Msg) {
 	}
 }
 
-func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsConsumerAckSubject string) bool {
+func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsConsumerAckSubject string, natsReplySubjectPrefix string) bool {
 	request := common.ConsumerGetRequest{}
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -147,7 +113,7 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	}
 
 	log.Infof("Request Consumer Get [%s]", natsConsumerGetSubject)
-	msg, err := natsConnection.Request(natsConsumerGetSubject, buffer, 3*time.Second)
+	msg, err := common.Request(natsConnection, natsConsumerGetSubject, natsReplySubjectPrefix, buffer, 3*time.Second)
 	if err != nil {
 		if err == nats.ErrTimeout {
 			log.Error(err)
@@ -188,7 +154,7 @@ func processItem(natsConnection *nats.Conn, natsConsumerGetSubject string, natsC
 	}
 
 	log.Infof("Request Consumer Ack [%s]", natsConsumerAckSubject)
-	msg, err = natsConnection.Request(natsConsumerAckSubject, buffer, 3*time.Second)
+	msg, err = common.Request(natsConnection, natsConsumerAckSubject, natsReplySubjectPrefix, buffer, 3*time.Second)
 	if err != nil {
 		if err == nats.ErrTimeout {
 			log.Error(err)

@@ -1,16 +1,20 @@
 natsUrl:
   nats://user:user@127.0.0.1:34222
 natsName:
-  consumer 1
-natsSubjectPrefix:
-  leaf.data-stream.consumer.persistent
+  NATS Queue Consumer
+bucket:
+  bucket1
+natsIncomingSubjectPrefix:
+  leaf.incoming.data-stream
+natsOutgoingSubjectPrefix:
+  leaf.outgoing.data-stream
+natsConsumerSubjectPrefix:
+  consumer.persistent
 natsGetSubjectSuffix:
   get
 natsAckSubjectSuffix:
   ack
 natsAnnSubjectSuffix:
   ann
-producerBucket:
-  bucket1
 pollTimeoutInMs:
   1000
