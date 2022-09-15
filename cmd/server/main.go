@@ -15,81 +15,56 @@ import (
 	"strings"
 )
 
+type options struct {
+	natsUrl                     string
+	natsName                    string
+	storagePath                 string
+	natsSubjectPrefix           string
+	natsProducerSubjectPrefix   string
+	natsConsumerSubjectPrefix   string
+	natsEphemeralSubjectPrefix  string
+	natsPersistentSubjectPrefix string
+	natsPutSubjectSuffix        string
+	natsGetSubjectSuffix        string
+	natsAckSubjectSuffix        string
+	natsAnnSubjectSuffix        string
+}
+
 func main() {
 	log.Info("Starting up Data Stream Service")
 
-	const natsNameDefault = "NATS Queue Service"
-	const storagePathDefault = "./.queue"
-	const natsSubjectPrefixDefault = "leaf.data-stream"
+	opt := getOptions()
 
-	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
-	viper.SetDefault("natsName", natsNameDefault)
-	viper.SetDefault("storagePath", storagePathDefault)
-	viper.SetDefault("natsSubjectPrefix", natsSubjectPrefixDefault)
-	viper.SetDefault("natsProducerSubjectPrefix", "producer")
-	viper.SetDefault("natsConsumerSubjectPrefix", "consumer")
-	viper.SetDefault("natsEphemeralSubjectPrefix", "ephemeral")
-	viper.SetDefault("natsPersistentSubjectPrefix", "persistent")
-	viper.SetDefault("natsPutSubjectSuffix", "put")
-	viper.SetDefault("natsGetSubjectSuffix", "get")
-	viper.SetDefault("natsAckSubjectSuffix", "ack")
-	viper.SetDefault("natsAnnSubjectSuffix", "ann")
-
-	viper.SetConfigName("server_config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
-		}
-	}
-
-	pflag.String("natsName", natsNameDefault, "NATS connection name")
-	pflag.String("storagePath", storagePathDefault, "Storage path directory")
-	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
-	pflag.Parse()
-	err := viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	natsUrl := viper.GetString("natsUrl")
-	natsName := viper.GetString("natsName")
-	storagePath := viper.GetString("storagePath")
-	natsSubjectPrefix := viper.GetString("natsSubjectPrefix")
-	natsProducerSubjectPrefix := viper.GetString("natsProducerSubjectPrefix")
-	natsConsumerSubjectPrefix := viper.GetString("natsConsumerSubjectPrefix")
-	natsEphemeralSubjectPrefix := viper.GetString("natsEphemeralSubjectPrefix")
-	natsPersistentSubjectPrefix := viper.GetString("natsPersistentSubjectPrefix")
-	natsPutSubjectSuffix := viper.GetString("natsPutSubjectSuffix")
-	natsGetSubjectSuffix := viper.GetString("natsGetSubjectSuffix")
-	natsAckSubjectSuffix := viper.GetString("natsAckSubjectSuffix")
-	natsAnnSubjectSuffix := viper.GetString("natsAnnSubjectSuffix")
-
-	natsProducerPutSubjectPrefix := fmt.Sprintf("%s.%s.%s.", natsSubjectPrefix, natsProducerSubjectPrefix, natsPutSubjectSuffix)
+	natsProducerPutSubjectPrefix := fmt.Sprintf("%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsProducerSubjectPrefix, opt.natsPutSubjectSuffix)
 	natsProducerPutSubject := fmt.Sprintf("%s*", natsProducerPutSubjectPrefix)
 
-	natsPersistentConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsPersistentSubjectPrefix, natsGetSubjectSuffix)
+	natsPersistentConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsGetSubjectSuffix)
 	natsPersistentConsumerGetSubject := fmt.Sprintf("%s*", natsPersistentConsumerGetSubjectPrefix)
 
-	natsPersistentConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsPersistentSubjectPrefix, natsAckSubjectSuffix)
+	natsPersistentConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsAckSubjectSuffix)
 	natsPersistentConsumerAckSubject := fmt.Sprintf("%s*", natsPersistentConsumerAckSubjectPrefix)
 
-	natsPersistentConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsPersistentSubjectPrefix, natsAnnSubjectSuffix)
+	natsPersistentConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsPersistentSubjectPrefix, opt.natsAnnSubjectSuffix)
 
-	natsEphemeralConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsGetSubjectSuffix)
+	natsEphemeralConsumerGetSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsGetSubjectSuffix)
 	natsEphemeralConsumerGetSubject := fmt.Sprintf("%s*", natsEphemeralConsumerGetSubjectPrefix)
 
-	natsEphemeralConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAckSubjectSuffix)
+	natsEphemeralConsumerAckSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsAckSubjectSuffix)
 	natsEphemeralConsumerAckSubject := fmt.Sprintf("%s*", natsEphemeralConsumerAckSubjectPrefix)
 
-	natsEphemeralConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", natsSubjectPrefix, natsConsumerSubjectPrefix, natsEphemeralSubjectPrefix, natsAnnSubjectSuffix)
+	natsEphemeralConsumerAnnSubjectPrefix := fmt.Sprintf("%s.%s.%s.%s.", opt.natsSubjectPrefix,
+		opt.natsConsumerSubjectPrefix, opt.natsEphemeralSubjectPrefix, opt.natsAnnSubjectSuffix)
 
 	ephemeralQueue := ephemeral.New()
 
 	log.Info("Opening Persisted Queue")
-	queue, err := goque.OpenPrefixQueue(storagePath)
+	queue, err := goque.OpenPrefixQueue(opt.storagePath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,14 +87,14 @@ func main() {
 		}
 
 		log.Info("Reopening Persisted Queue")
-		queue, err = goque.OpenPrefixQueue(storagePath)
+		queue, err = goque.OpenPrefixQueue(opt.storagePath)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	log.Infof("Connecting to NATS '%s'", natsUrl)
-	natsConnection, err := common.ConnectToNats(natsUrl, natsName)
+	log.Infof("Connecting to NATS '%s'", opt.natsUrl)
+	natsConnection, err := common.ConnectToNats(opt.natsUrl, opt.natsName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -235,4 +210,61 @@ func publishConsumerGetReplyError(connection *nats.Conn, subject string, err err
 func publishConsumerAckReplyError(connection *nats.Conn, subject string, err error) {
 	log.Infof("Reply Consumer Ack [Error: %s]", err.Error())
 	common.Publish(connection, subject, &common.ConsumerAckReply{Error: err.Error()})
+}
+
+func getOptions() *options {
+	var opt options
+
+	const natsNameDefault = "NATS Queue Service"
+	const storagePathDefault = "./.queue"
+	const natsSubjectPrefixDefault = "leaf.data-stream"
+
+	viper.SetDefault("natsUrl", "nats://leaf_user:leaf_user@127.0.0.1:34111")
+	viper.SetDefault("natsName", natsNameDefault)
+	viper.SetDefault("storagePath", storagePathDefault)
+	viper.SetDefault("natsSubjectPrefix", natsSubjectPrefixDefault)
+	viper.SetDefault("natsProducerSubjectPrefix", "producer")
+	viper.SetDefault("natsConsumerSubjectPrefix", "consumer")
+	viper.SetDefault("natsEphemeralSubjectPrefix", "ephemeral")
+	viper.SetDefault("natsPersistentSubjectPrefix", "persistent")
+	viper.SetDefault("natsPutSubjectSuffix", "put")
+	viper.SetDefault("natsGetSubjectSuffix", "get")
+	viper.SetDefault("natsAckSubjectSuffix", "ack")
+	viper.SetDefault("natsAnnSubjectSuffix", "ann")
+
+	viper.SetConfigName("server_config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./")
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			log.Fatalf("fatal error config file: %s", fmt.Errorf("%w", err))
+		}
+	}
+
+	pflag.String("natsName", natsNameDefault, "NATS connection name")
+	pflag.String("storagePath", storagePathDefault, "Storage path directory")
+	pflag.String("natsSubjectPrefix", natsSubjectPrefixDefault, "NATS subject prefix")
+	pflag.Parse()
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	opt.natsUrl = viper.GetString("natsUrl")
+	opt.natsName = viper.GetString("natsName")
+	opt.storagePath = viper.GetString("storagePath")
+	opt.natsSubjectPrefix = viper.GetString("natsSubjectPrefix")
+	opt.natsProducerSubjectPrefix = viper.GetString("natsProducerSubjectPrefix")
+	opt.natsConsumerSubjectPrefix = viper.GetString("natsConsumerSubjectPrefix")
+	opt.natsEphemeralSubjectPrefix = viper.GetString("natsEphemeralSubjectPrefix")
+	opt.natsPersistentSubjectPrefix = viper.GetString("natsPersistentSubjectPrefix")
+	opt.natsPutSubjectSuffix = viper.GetString("natsPutSubjectSuffix")
+	opt.natsGetSubjectSuffix = viper.GetString("natsGetSubjectSuffix")
+	opt.natsAckSubjectSuffix = viper.GetString("natsAckSubjectSuffix")
+	opt.natsAnnSubjectSuffix = viper.GetString("natsAnnSubjectSuffix")
+
+	log.Infof("Configuration: %+v", opt)
+
+	return &opt
 }

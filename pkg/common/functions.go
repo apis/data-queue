@@ -52,8 +52,8 @@ func Request(natsConnection *nats.Conn, subject string, requestInboxPrefix strin
 		return nil, nats.ErrInvalidConnection
 	}
 
-	//reply := fmt.Sprintf("%s.%s", requestInboxPrefix, nats.NewInbox())
-	reply := nats.NewInbox()
+	reply := fmt.Sprintf("%s.%s", requestInboxPrefix, nats.NewInbox())
+	//reply := nats.NewInbox()
 	log.Infof("Inbox: %s", reply)
 
 	subscription, err := natsConnection.SubscribeSync(reply)
